@@ -1,0 +1,54 @@
+NamelistReader can be used to read in a set of Fortran namelists from a file. A simple use example:
+
+#include "NamelistReader.hpp"
+  
+int main(){
+    // Your variables that you want populated.
+    // These can currently be int, float, double, or std::string
+    int int1, int2;
+    float float1, float2;
+    double double1, double2;
+    std::string str1, str2;
+
+    NLReader::NamelistReader nlr("input_file"); // All file reading is done here
+
+    // Specify the namelist you want to read from
+    nlr.use_namelist("first_namelist");
+
+    // By default, no inputs are required. If you want, you can use this to ensure that the following
+    // parameters are present and read
+    nlr.begin_required();
+
+    // Set your variable to the matching string in the namelist
+    nlr.set(int1,"int1");
+    nlr.set(float1,"float1");
+
+    // If you want to go to a different namelist, use use_namelist again:
+    nlr.use_namelist("second_namelist");
+    nlr.set(str1, "str1");
+
+    // If you set begin_required(), you can revert back any time and the following parameters
+    // will be considered optional again.
+    nlr.begin_optional();
+
+    nlr.set(str2, "str2"); // (Still in "second_namelist")
+
+    nlr.use_namelist("third_namelist");
+    nlr.set(double2, "double2");
+
+    // If the parameter in the namelist has multiple values, you have to read them individually,
+    // by specifying the index of the value. e.g. if your namelist has:
+    // double_list = 3.14d0 2.72d0
+    // and you want it to populate a vector, then do the following:
+    std::vector<double> double_list(2);
+
+    for (int i = 0; i<double_list.size(); i++){
+        nlr.set(double_list[i],"double_list",i);
+    }
+
+    // Lastly, unlike when reading in Fortran, you will not get an error if there are
+    // parameters present in the namelist that are not used. You can check for such
+    // parameters:
+    if (!nlr.check_all_used()) printf("\nExtra parameters in the namelist!\n");
+    
+}
