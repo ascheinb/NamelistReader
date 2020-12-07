@@ -105,17 +105,22 @@ class NamelistReader{
     bool required;
     bool use_all;
 
-    void string_to_param(bool& var, string& param){
+    template<typename T>
+    T string_to_param(string& param);
+
+    template<>
+    bool string_to_param<bool>(string& param){
         // Make lower case
         for (int i = 0; i<param.size(); i++)
             param[i]=tolower(param[i]);
 
         if (param==".false."){
-            var = false;
+            return false;
         } else if  (param==".true."){
-            var = true;
+            return true;
         } else {
             printf("Error, couldn't parse %s", param.c_str());
+            return false;
         }
     }
 
@@ -124,24 +129,28 @@ class NamelistReader{
             if (param[i]=='D' || param[i]=='d') param[i]='e';
     }
 
-    void string_to_param(int& var, string& param){
+    template<>
+    int string_to_param<int>(string& param){
         change_D_to_E(param);
-        var=stoi(param);
+        return stoi(param);
     }
 
-    void string_to_param(float& var, string& param){
+    template<>
+    float string_to_param<float>(string& param){
         change_D_to_E(param);
-        var=stof(param);
+        return stof(param);
     }
 
-    void string_to_param(double& var, string& param){
+    template<>
+    double string_to_param<double>(string& param){
         change_D_to_E(param);
-        var=stod(param);
+        return stod(param);
     }
 
-    void string_to_param(string& var, string& param){
+    template<>
+    string string_to_param<string>(string& param){
         // Remove the quotes
-        var=param.substr(1,param.size()-2);
+        return param.substr(1,param.size()-2);
     }
 
     public:
@@ -260,7 +269,7 @@ class NamelistReader{
     }
 
     template <typename T>
-    void set(T& var, const string& param, int val_ind=0){
+    T set(const string& param, const T default_val, int val_ind=0){
         if (namelist_index==-1){
             printf("\nNeed to choose which namelist to use with use_namelist(const std::string&)!\n");
         }
@@ -272,6 +281,7 @@ class NamelistReader{
             if ((*it).name==param) break;
             ++it;
         }
+
         if (it != namelists[namelist_index].params.end())
             param_index = distance(namelists[namelist_index].params.begin(), it);
         else{
@@ -279,17 +289,18 @@ class NamelistReader{
                 printf("\nParameter '%s' not found in namelist '%s'!",param.c_str(),namelists[namelist_index].name.c_str());
                 exit(1);
             }
-            return;
+            return default_val;
         }
 
         namelists[namelist_index].params[param_index].used=true;
 
         if (val_ind>=0 && val_ind<namelists[namelist_index].params[param_index].values.size()){
             string str_var = namelists[namelist_index].params[param_index].values[val_ind];
-            string_to_param(var,str_var);
+            return string_to_param<T>(str_var);
         } else {
             printf("\nParameter '%s' in namelist '%s' didn't have enough values!",param.c_str(),namelists[namelist_index].name.c_str());
             exit(1);
+            return default_val;
         }
     }
 };
