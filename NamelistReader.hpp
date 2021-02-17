@@ -99,59 +99,59 @@ string get_first_value(string& str, int start){
     return str.substr(start,str.size()-start);
 }
 
+template<typename T>
+T string_to_param(string& param);
+
+template<>
+bool string_to_param<bool>(string& param){
+    // Make lower case
+    for (int i = 0; i<param.size(); i++)
+        param[i]=tolower(param[i]);
+
+    if (param==".false."){
+        return false;
+    } else if  (param==".true."){
+        return true;
+    } else {
+        printf("Error, couldn't parse %s", param.c_str());
+        return false;
+    }
+}
+
+void change_D_to_E(string& param){
+    for (int i = 0; i<param.size(); i++)
+        if (param[i]=='D' || param[i]=='d') param[i]='e';
+}
+
+template<>
+int string_to_param<int>(string& param){
+    change_D_to_E(param);
+    return stoi(param);
+}
+
+template<>
+float string_to_param<float>(string& param){
+    change_D_to_E(param);
+    return stof(param);
+}
+
+template<>
+double string_to_param<double>(string& param){
+    change_D_to_E(param);
+    return stod(param);
+}
+
+template<>
+string string_to_param<string>(string& param){
+    // Remove the quotes
+    return param.substr(1,param.size()-2);
+}
+
 class NamelistReader{
     vector<NameList> namelists;
     int namelist_index;
     bool required;
     bool use_all;
-
-    template<typename T>
-    T string_to_param(string& param);
-
-    template<>
-    bool string_to_param<bool>(string& param){
-        // Make lower case
-        for (int i = 0; i<param.size(); i++)
-            param[i]=tolower(param[i]);
-
-        if (param==".false."){
-            return false;
-        } else if  (param==".true."){
-            return true;
-        } else {
-            printf("Error, couldn't parse %s", param.c_str());
-            return false;
-        }
-    }
-
-    void change_D_to_E(string& param){
-        for (int i = 0; i<param.size(); i++)
-            if (param[i]=='D' || param[i]=='d') param[i]='e';
-    }
-
-    template<>
-    int string_to_param<int>(string& param){
-        change_D_to_E(param);
-        return stoi(param);
-    }
-
-    template<>
-    float string_to_param<float>(string& param){
-        change_D_to_E(param);
-        return stof(param);
-    }
-
-    template<>
-    double string_to_param<double>(string& param){
-        change_D_to_E(param);
-        return stod(param);
-    }
-
-    template<>
-    string string_to_param<string>(string& param){
-        // Remove the quotes
-        return param.substr(1,param.size()-2);
-    }
 
     public:
 
