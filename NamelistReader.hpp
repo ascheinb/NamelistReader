@@ -269,7 +269,7 @@ class NamelistReader{
     }
 
     template <typename T>
-    T set(const string& param, const T default_val, int val_ind=0){
+    T get(const string& param, const T default_val, int val_ind=0){
         if (namelist_index==-1){
             printf("\nNeed to choose which namelist to use with use_namelist(const std::string&)!\n");
         }
