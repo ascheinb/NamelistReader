@@ -1,58 +1,58 @@
 NamelistReader can be used to read in a set of Fortran namelists from a file. The namelists are stored in a NamelistReader object.
 
-# Basic Functions
+## Basic Functions
 
-## `NamelistReader(const string& filename)`
+### `NamelistReader(const string& filename)`
 
-Reads and parses the input file `filename`.
+Constructor that reads and parses the input file `filename`.
 
-## `NamelistReader(const string& str_name, ReadFrom read_from)`
+### `NamelistReader(const string& str_name, NLReader::ReadFromString)`
 
-Reads and parses an input string `str_name` rather than a file, if `read_from` is `NLReader::ReadFromString`.
+Constructor that reads and parses an input string `str_name` rather than a file.
 
-## `void use_namelist(const string& namelist)`
+### `void use_namelist(const string& namelist)`
 
 Specifies which namelist the subsequent function calls are going to look in. Must be called before `present`, `get`, or `get_required`.
 
-## `bool present(const string& param)`
+### `bool present(const string& param)`
 
 Checks if the input parameter `param` is present in the last specified namelist.
 
-## `template <typename T> T get(const string& param, const T default_val, int val_ind=0)`
+### `template <typename T> T get(const string& param, const T default_val, int val_ind=0)`
 
 If the input parameter `param` is present in the last specified namelist, returns the value.
 If `param` is not present, returns `default_val`.
 The third argument is optional. Use it to specify which value you want if there are multiple values in the input file. (The index is 0-indexed.)
 
-## `template <typename T> T get_required(const string& param, int val_ind=0)`
+### `template <typename T> T get_required(const string& param, int val_ind=0)`
 
 Like `get`, but there is no default value for the parameter. If the parameter is not present in the namelist, the program will exit.
 
-## `bool check_all_used()`
+### `bool check_all_used()`
 
 Checks whether every parameter in the input file has been accessed by `get` or `get_required`. Prints a warning listing the parameters that have not been used, if any.
 
-# Advanced Functions
+## Advanced Functions
 
 If you wish to manipulate your namelists or create them from scratch, you can use these functions.
 
-## `NamelistReader(Create create)`
+### `NamelistReader(NLReader::CreateManually)`
 
-If `create` is `NLReader::CreateManually`, starts from scratch and enables modifications so you can construct your namelists from scratch.
+Constructor that starts from scratch and enables modifications so you can construct your namelists from scratch.
 
-## `void enable_modifications()`
+### `void enable_modifications()`
 
 Enables modifications via `add_namelist` and `add_to_namelist`.
 
-## `void add_namelist(const string& namelist)`
+### `void add_namelist(const string& namelist)`
 
 Adds a new namelist. Modifications must be enabled.
 
-## `void add_to_namelist(const string& param, const string& val)`
+### `void add_to_namelist(const string& param, const string& val)`
 
 Adds a new input parameter to the final namelist. Modifications must be enabled.
 
-# A simple use example
+## Example
 
 ```
 #include "NamelistReader.hpp"
