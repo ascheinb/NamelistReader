@@ -1,4 +1,8 @@
+#ifndef NAMELISTREADER_HPP
+#define NAMELISTREADER_HPP
+
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -16,6 +20,15 @@ enum Expect {
     Equals,
     Value,
     ValueOrEOL
+};
+
+enum ReadFrom {
+    ReadFromFile=0,
+    ReadFromString
+};
+
+enum Create {
+    CreateManually=0
 };
 
 // trim from left
@@ -67,7 +80,7 @@ struct NameList{
     }
 };
 
-string get_first_word(string& str, int start){
+static inline string get_first_word(string& str, int start){
     for (string::size_type i = start; i < str.size(); i++){
         if ((str[i]>=48 && str[i]<=57) || (str[i]>=65 && str[i]<=90) ||
             (str[i]>=97 && str[i]<=122) || str[i]==95){
@@ -80,7 +93,7 @@ string get_first_word(string& str, int start){
     return str.substr(start,str.size()-start);
 }
 
-string get_first_value(string& str, int start){
+static inline string get_first_value(string& str, int start){
     bool in_squote=false;
     bool in_dquote=false;
     for (string::size_type i = start; i < str.size(); i++){
@@ -100,7 +113,7 @@ string get_first_value(string& str, int start){
 }
 
 template<typename T>
-T string_to_param(string& param);
+static inline T string_to_param(string& param);
 
 template<>
 bool string_to_param<bool>(string& param){
@@ -113,12 +126,12 @@ bool string_to_param<bool>(string& param){
     } else if  (param==".true."){
         return true;
     } else {
-        printf("Error, couldn't parse %s", param.c_str());
+        printf("Error, couldn't parse %s \n", param.c_str());
         return false;
     }
 }
 
-void change_D_to_E(string& param){
+static inline void change_D_to_E(string& param){
     for (int i = 0; i<param.size(); i++)
         if (param[i]=='D' || param[i]=='d') param[i]='e';
 }
@@ -150,23 +163,137 @@ string string_to_param<string>(string& param){
 class NamelistReader{
     vector<NameList> namelists;
     int namelist_index;
-    bool required;
     bool use_all;
+    bool modifiable;
+
+    template<class T>
+    void parse_lines(T& newfile, const string& filename){
+        const bool verbose=false;
+        string line;
+        Expect expect = Ampersand;
+        int i_line=0;
+        while(getline(newfile, line)){ //read data from file object and put it into string.
+            i_line++;
+            trim(line); // Remove leading and trailing whitespace
+            for (string::size_type i = 0; i < line.size(); i++){
+                if (line[i]=='!'){
+                    // Comment has begun
+                    break;
+                }
+                if (expect==Ampersand){
+                    if (line[i]=='&'){
+                        expect=NLName;
+                    }
+                } else if (expect==NLName){
+                    string word = get_first_word(line,i);
+                    if (word.size()>0){ // Found namelist name
+                        expect = ParaNameOrEnd;
+                        namelists.push_back(NameList(word));
+                        if (verbose) cout << "Found namelist: " << word << "\n";
+                        break;
+                    }
+                } else if(expect==ParaNameOrEnd){
+                    if (line[i]=='/'){ // End of namelist
+                        expect=Ampersand;
+                        break;
+                    }
+
+                    string word = get_first_word(line,i);
+                    if (word.size()>0){
+                        i+=word.size()-1;
+                        expect = Equals;
+                        namelists[namelists.size()-1].add_param(word);
+                        if (verbose) cout << "  Found parameter: " << word << "\n";
+                    }
+                } else if(expect==Equals){
+                    if (line[i]=='='){
+                        expect=Value;
+                    }
+                } else if(expect==Value || expect == ValueOrEOL){
+                    string word = get_first_value(line,i);
+                    if (word.size()>0){
+                        i+=word.size()-1;
+                        expect = ValueOrEOL;
+                        namelists[namelists.size()-1].add_value(word);
+                        if (verbose) cout << "    Found Value: " << word << "\n";
+                    }
+                }
+            }
+            // Got to end of line
+            if (expect==NLName){
+                printf("\nParse failure reading %s at Line %d. Failed to find name of namelist.\n", filename.c_str(), i_line);
+                return;
+            } else if(expect==Equals){
+                printf("\nParse failure reading %s at Line %d. Expected parameter assignment.\n", filename.c_str(), i_line);
+                return;
+            } else if(expect==Value){
+                printf("\nParse failure reading %s at Line %d. Couldn't parse value assignment.\n", filename.c_str(), i_line);
+                return;
+            }
+            // Hit EOL, now expecting next parameter
+            if (expect==ValueOrEOL) expect = ParaNameOrEnd;
+        }
+    }
+
+    void load(const string& filename){
+        fstream newfile;
+        newfile.open(filename,ios::in); //open a file to perform read operation using file object
+        if (!newfile.is_open()) return; //checking whether the file is open
+
+        parse_lines(newfile,filename);
+
+        newfile.close(); //close the file object.
+    }
+
+    void load_from_string(const string& str){
+        istringstream f(str.c_str());
+
+        parse_lines(f,"string input");
+    }
 
     public:
 
     NamelistReader(const string& filename)
-        : namelist_index(-1), required(false), use_all(false)
+        : namelist_index(-1), use_all(false), modifiable(false)
     {
         load(filename);
     }
 
-    void begin_required(){
-        required=true;
+    NamelistReader(const string& str_name, ReadFrom read_from)
+        : namelist_index(-1), use_all(false), modifiable(false)
+    {
+        if (read_from==ReadFromFile){
+            load(str_name);
+        }else{
+            load_from_string(str_name);
+        }
     }
 
-    void begin_optional(){
-        required=false;
+    NamelistReader(Create create)
+        : namelist_index(-1), use_all(false), modifiable(false)
+    {
+        if (create==CreateManually) modifiable = true;
+    }
+
+    void enable_modifications(){
+        modifiable = true;
+    }
+
+    void add_namelist(const string& namelist){
+        if (modifiable){
+            namelists.push_back(NameList(namelist));
+        } else {
+            printf("Warning: 'add_namelist' ignored, only valid if NamelistReader is in CreateManually mode");
+        }
+    }
+
+    void add_to_namelist(const string& param, const string& val){
+        if (modifiable){
+            namelists[namelists.size()-1].add_param(param);
+            namelists[namelists.size()-1].add_value(val);
+        } else {
+            printf("Warning: 'add_to_namelist' ignored, only valid if NamelistReader is in CreateManually mode");
+        }
     }
 
     bool check_all_used(){
@@ -182,79 +309,6 @@ class NamelistReader{
         return (n_unused==0);
     }
 
-    void load(const string& filename){
-        bool verbose=false;
-        fstream newfile;
-        newfile.open(filename,ios::in); //open a file to perform read operation using file object
-        if (newfile.is_open()){   //checking whether the file is open
-            string line;
-            Expect expect = Ampersand;
-            int i_line=0;
-            while(getline(newfile, line)){ //read data from file object and put it into string.
-                i_line++;
-                trim(line); // Remove leading and trailing whitespace
-                for (string::size_type i = 0; i < line.size(); i++){
-                    if (line[i]=='!'){
-                        // Comment has begun
-                        break;
-                    }
-                    if (expect==Ampersand){
-                        if (line[i]=='&'){
-                            expect=NLName;
-                        }
-                    } else if (expect==NLName){
-                        string word = get_first_word(line,i);
-                        if (word.size()>0){ // Found namelist name
-                            expect = ParaNameOrEnd;
-                            namelists.push_back(NameList(word));
-                            if (verbose) cout << "Found namelist: " << word << "\n";
-                            break;
-                        }
-                    } else if(expect==ParaNameOrEnd){
-                        if (line[i]=='/'){ // End of namelist
-                            expect=Ampersand;
-                            break;
-                        }
-
-                        string word = get_first_word(line,i);
-                        if (word.size()>0){
-                            i+=word.size()-1;
-                            expect = Equals;
-                            namelists[namelists.size()-1].add_param(word);
-                            if (verbose) cout << "  Found parameter: " << word << "\n";
-                        }
-                    } else if(expect==Equals){
-                        if (line[i]=='='){
-                            expect=Value;
-                        }
-                    } else if(expect==Value || expect == ValueOrEOL){
-                        string word = get_first_value(line,i);
-                        if (word.size()>0){
-                            i+=word.size()-1;
-                            expect = ValueOrEOL;
-                            namelists[namelists.size()-1].add_value(word);
-                            if (verbose) cout << "    Found Value: " << word << "\n";
-                        }
-                    }
-                }
-                // Got to end of line
-                if (expect==NLName){
-                    printf("\nParse failure reading %s at Line %d. Failed to find name of namelist.\n", filename.c_str(), i_line);
-                    return;
-                } else if(expect==Equals){
-                    printf("\nParse failure reading %s at Line %d. Expected parameter assignment.\n", filename.c_str(), i_line);
-                    return;
-                } else if(expect==Value){
-                    printf("\nParse failure reading %s at Line %d. Couldn't parse value assignment.\n", filename.c_str(), i_line);
-                    return;
-                }
-                // Hit EOL, now expecting next parameter
-                if (expect==ValueOrEOL) expect = ParaNameOrEnd;
-            }
-            newfile.close(); //close the file object.
-        }
-    }
-
     void use_namelist(const string& namelist){
         // Locate the requested namelist
         vector<NameList>::iterator it = namelists.begin();
@@ -266,6 +320,21 @@ class NamelistReader{
             namelist_index = distance(namelists.begin(), it);
         else
             printf("\nNamelist '%s' not found in the file!",namelist.c_str());
+    }
+
+    bool present(const string& param){
+        if (namelist_index==-1){
+            printf("\nNeed to choose which namelist to use with use_namelist(const std::string&)!\n");
+        }
+
+        // Locate the requested parameter
+        vector<Param>::iterator it = namelists[namelist_index].params.begin();
+        while (it!=namelists[namelist_index].params.end()) {
+            if ((*it).name==param) break;
+            ++it;
+        }
+
+        return (it != namelists[namelist_index].params.end());
     }
 
     template <typename T>
@@ -285,10 +354,6 @@ class NamelistReader{
         if (it != namelists[namelist_index].params.end())
             param_index = distance(namelists[namelist_index].params.begin(), it);
         else{
-            if (required){
-                printf("\nParameter '%s' not found in namelist '%s'!",param.c_str(),namelists[namelist_index].name.c_str());
-                exit(1);
-            }
             return default_val;
         }
 
@@ -303,6 +368,39 @@ class NamelistReader{
             return default_val;
         }
     }
+
+    template <typename T>
+    T get_required(const string& param, int val_ind=0){
+        if (namelist_index==-1){
+            printf("\nNeed to choose which namelist to use with use_namelist(const std::string&)!\n");
+        }
+
+        // Locate the requested parameter
+        int param_index = -1;
+        vector<Param>::iterator it = namelists[namelist_index].params.begin();
+        while (it!=namelists[namelist_index].params.end()) {
+            if ((*it).name==param) break;
+            ++it;
+        }
+
+        if (it != namelists[namelist_index].params.end())
+            param_index = distance(namelists[namelist_index].params.begin(), it);
+        else{
+            printf("\nParameter '%s' not found in namelist '%s'!",param.c_str(),namelists[namelist_index].name.c_str());
+            exit(1);
+        }
+
+        namelists[namelist_index].params[param_index].used=true;
+
+        if (val_ind>=0 && val_ind<namelists[namelist_index].params[param_index].values.size()){
+            string str_var = namelists[namelist_index].params[param_index].values[val_ind];
+            return string_to_param<T>(str_var);
+        } else {
+            printf("\nParameter '%s' in namelist '%s' didn't have enough values!",param.c_str(),namelists[namelist_index].name.c_str());
+            exit(1);
+        }
+    }
 };
 
 }
+#endif
